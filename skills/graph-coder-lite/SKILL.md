@@ -155,8 +155,21 @@ manager reviews against the unit contract
 ```
 
 Only a passing review moves a unit to `completed`, and only that makes dependents
-eligible. `gcl set` refuses `running -> completed` for exactly this reason: a
-worker that says it is done is not done.
+eligible. A worker that says it is done is not done.
+
+That is structural, not a convention. `gcl set` refuses all three verdict states;
+they exist only through `gcl review`, which will not record a pass without
+evidence, a repair without both a defect and an instruction, or an escalation
+without the question and what was already tried.
+
+```text
+gcl review <unit> --verdict pass --evidence "<real command output>"
+gcl review <unit> --verdict repair_required --defect "..." --repair "..."
+gcl review <unit> --verdict human_required --question "..." --attempted "..."
+```
+
+An escalation reports its own blast radius: the transitive dependents that are
+now blocked, and every independent unit that keeps running.
 
 The escalation ladder is bounded and nothing may lengthen it:
 
@@ -187,10 +200,12 @@ gcl init                                  write a starting plan
 gcl check                                 every defect in the plan, in one pass
 gcl status                                states, frontier, what blocks what
 gcl emit [--unit ID]                      packets for the ready units + preflight
-gcl set <unit> <state> [--note ...]       record a transition
+gcl set <unit> <state> [--note ...]       record a transition, never a verdict
+gcl verify <unit>                         gather the evidence a review rests on
+gcl review <unit> --verdict <v> ...       the only path to completed
 gcl route set --model M [--fallback F] [--unit ID] [--evidence E]
 gcl approve --rendered                    bind approval to the unit contracts
-gcl verify <unit>                         gather the evidence a review rests on
+gcl recover [--apply]                     reconcile after an interrupted session
 ```
 
 Do not invent commands. Everything the run needs is above.

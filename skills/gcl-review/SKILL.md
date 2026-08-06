@@ -70,9 +70,26 @@ Only `pass` moves a unit to `completed`, and only that makes dependents eligible
 A test that passes while the write scope was violated is not a pass: report the
 scope violation as the defect.
 
-Record the verdict with `gcl set <unit> completed` or `gcl set <unit>
-repair_required --note "<the defect>"`. The state machine refuses `running ->
-completed`, so a unit cannot reach done without passing through your review.
+Record the verdict with `gcl review`, which is the only way any unit reaches
+`completed`. `gcl set` refuses all three verdict states, so a completion always
+carries the evidence that justified it.
+
+```text
+gcl review <unit> --verdict pass --evidence "<real command output>"
+gcl review <unit> --verdict repair_required --defect "<what is wrong>" \
+                                             --repair "<what to do about it>"
+gcl review <unit> --verdict human_required --question "<the decision needed>" \
+                                            --attempted "<what already failed>"
+```
+
+Each requirement is enforced, not suggested. A pass with no evidence is the
+worker's own say-so wearing your name. A defect with no repair instruction is a
+complaint: the worker is sent back with nothing to act on. An escalation with no
+account of what was already tried makes whoever picks it up start from zero.
+
+`human_required` computes the blast radius for you and reports it: the transitive
+dependents that are now blocked, and every independent unit that keeps running.
+Use those two lists verbatim when you tell the user what is stuck.
 
 ## Advice
 
@@ -156,9 +173,11 @@ is blocked and what continues.
   failed, and unknown. Never emit a `+N more` summary in place of rows. Show an
   ETA only when it comes from observed progress; otherwise write `unknown`.
 - Never guess a model, an ETA, or a completion from a friendly session name.
-- After a reload, rebuild from `gcl status` and the repository, then resume,
-  replace, or mark interrupted exactly once. Never infer that an unknown session
-  completed.
+- After a reload, run `gcl recover`. It names two things that survive a crash
+  badly: a unit left running whose worker is gone, and a unit marked complete by
+  a write that landed while the review justifying it did not. `--apply` reopens
+  both as failed attempts, preserving the attempt counts. Never infer that an
+  unknown session completed.
 
 ## Stop and escalate on
 

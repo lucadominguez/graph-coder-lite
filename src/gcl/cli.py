@@ -12,8 +12,8 @@ from typing import Any
 from gcl import graph as graph_module
 from gcl import packet as packet_module
 from gcl import plan as plan_module
-from gcl.errors import GclError
-from gcl.state import RunState
+from gcl.errors import GclError, StateError
+from gcl.state import VERDICT_STATES, RunState
 
 DEFAULT_PLAN = "PLAN.md"
 
@@ -143,9 +143,109 @@ def cmd_set(args: argparse.Namespace) -> dict[str, Any]:
     state.sync(list(plan.unit_ids), plan_id=plan.plan_id, plan_hash=plan_module.approval_hash(plan))
     if args.unit not in plan.unit_ids:
         raise GclError(f"no unit {args.unit} in the plan")
+    if args.state in VERDICT_STATES.values():
+        raise GclError(
+            f"`{args.state}` is a manager verdict, not a transition you record by hand. "
+            f"Use `gcl review {args.unit} --verdict <pass|repair_required|human_required>`, "
+            "which requires the evidence or the defect that justifies it."
+        )
     node = state.transition(args.unit, args.state, note=args.note or "")
     state.save()
     return {"ok": True, "unit": args.unit, "node": node}
+
+
+def cmd_review(args: argparse.Namespace) -> dict[str, Any]:
+    """Record a manager verdict. The only way a unit reaches `completed`."""
+
+    plan = _load(args)
+    state = RunState.load(Path(args.root))
+    state.sync(list(plan.unit_ids), plan_id=plan.plan_id, plan_hash=plan_module.approval_hash(plan))
+    if args.unit not in plan.unit_ids:
+        raise GclError(f"no unit {args.unit} in the plan")
+
+    impacted = graph_module.blocked_by(plan, args.unit) if args.verdict == "human_required" else []
+    try:
+        record = state.review(
+            args.unit,
+            args.verdict,
+            evidence=args.evidence,
+            defects=args.defect,
+            repairs=args.repair,
+            question=args.question or "",
+            attempted=args.attempted,
+            impacted=impacted,
+        )
+    except StateError as error:
+        raise GclError(str(error)) from error
+
+    payload: dict[str, Any] = {
+        "ok": True,
+        "unit": args.unit,
+        "verdict": args.verdict,
+        "status": state.status(args.unit),
+        "review": record,
+    }
+    if args.verdict == "human_required":
+        # Say plainly what is blocked and what continues, computed rather than
+        # estimated. An isolated failure must not stop independent work.
+        payload["blocked"] = impacted
+        payload["still_runnable"] = graph_module.still_runnable(plan, state.states(), args.unit)
+    if args.verdict == "pass":
+        payload["now_eligible"] = [
+            unit_id
+            for unit_id in graph_module.frontier(plan, state.states())
+            if args.unit in plan.unit(unit_id).dependencies
+        ]
+    state.save()
+    return payload
+
+
+def cmd_recover(args: argparse.Namespace) -> dict[str, Any]:
+    """Reconcile after an interruption, without inventing what happened.
+
+    Two things survive a crash badly: a unit left `running` whose worker is gone,
+    and a unit marked `completed` by a write that landed while the review that
+    justified it did not.
+    """
+
+    plan = _load(args)
+    state = RunState.load(Path(args.root))
+    # Read the stored hash before syncing, which overwrites it. Comparing after
+    # the write made this check unable to fire.
+    stored = state.payload.get("plan_hash", "")
+    current = plan_module.approval_hash(plan)
+    state.sync(list(plan.unit_ids), plan_id=plan.plan_id, plan_hash=current)
+
+    unverified = state.unverified_completions()
+    interrupted = [
+        unit_id
+        for unit_id, status in state.states().items()
+        if status in ("running", "awaiting_review")
+    ]
+    if args.apply:
+        for unit_id in unverified:
+            state.nodes[unit_id]["status"] = "failed"
+            state.event("recover", unit_id=unit_id, reason="completed with no passing review")
+        for unit_id in interrupted:
+            state.nodes[unit_id]["status"] = "failed"
+            state.event("recover", unit_id=unit_id, reason="in flight when the session ended")
+        state.save()
+
+    return {
+        "ok": True,
+        "applied": bool(args.apply),
+        "completed_without_a_passing_review": unverified,
+        "in_flight_when_the_session_ended": interrupted,
+        "plan_changed_since_the_state_was_written": stored != current,
+        "next": (
+            "Re-run with --apply to reopen these as failed attempts. Nothing is inferred to "
+            "have completed: a unit whose evidence you cannot produce is not done."
+            if (unverified or interrupted) and not args.apply
+            else "Nothing to reconcile."
+            if not (unverified or interrupted)
+            else "Reopened. Re-dispatch them; the attempt counts are preserved."
+        ),
+    }
 
 
 def cmd_route_set(args: argparse.Namespace) -> dict[str, Any]:
@@ -314,6 +414,26 @@ def build_parser() -> argparse.ArgumentParser:
     setter.add_argument("state")
     setter.add_argument("--note", default="")
     setter.set_defaults(handler=cmd_set)
+
+    review = commands.add_parser("review", help="record a manager verdict")
+    review.add_argument("unit")
+    review.add_argument(
+        "--verdict", required=True, choices=["pass", "repair_required", "human_required"]
+    )
+    review.add_argument(
+        "--evidence", action="append", help="pass: real command output or artifact check"
+    )
+    review.add_argument("--defect", action="append", help="repair_required: one bounded defect")
+    review.add_argument("--repair", action="append", help="repair_required: one instruction")
+    review.add_argument("--question", help="human_required: the decision the user must make")
+    review.add_argument("--attempted", action="append", help="human_required: what was tried")
+    review.set_defaults(handler=cmd_review)
+
+    recover = commands.add_parser("recover", help="reconcile after an interrupted session")
+    recover.add_argument(
+        "--apply", action="store_true", help="reopen what cannot be shown to have finished"
+    )
+    recover.set_defaults(handler=cmd_recover)
 
     route = commands.add_parser("route", help="routing operations").add_subparsers(
         dest="route_command", required=True

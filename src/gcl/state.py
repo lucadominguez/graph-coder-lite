@@ -56,6 +56,16 @@ TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 
+#: The three states only a manager verdict may produce. `gcl set` refuses them,
+#: so every completed unit carries a review record by construction rather than by
+#: convention, and a `repair_required` always names the defect it found.
+VERDICT_STATES = {
+    "pass": COMPLETED,
+    "repair_required": REPAIR_REQUIRED,
+    "human_required": HUMAN_REQUIRED,
+}
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -138,6 +148,98 @@ class RunState:
             node["note"] = note
         self.event("state", unit_id=unit_id, to=target, note=note)
         return node
+
+    def review(
+        self,
+        unit_id: str,
+        verdict: str,
+        *,
+        evidence: list[str] | None = None,
+        defects: list[str] | None = None,
+        repairs: list[str] | None = None,
+        question: str = "",
+        attempted: list[str] | None = None,
+        impacted: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Apply a manager verdict, refusing one that is not actually a review.
+
+        A `repair_required` with no bounded defect and no repair instruction is a
+        complaint, not a review: the worker is sent back with nothing to act on.
+        A `human_required` with no question and no account of what was already
+        tried leaves whoever picks it up starting from zero. A `pass` with no
+        evidence is the worker's own say-so wearing a manager's name.
+        """
+
+        if verdict not in VERDICT_STATES:
+            raise StateError(
+                f"unknown verdict `{verdict}`; expected one of {', '.join(sorted(VERDICT_STATES))}"
+            )
+        current = self.status(unit_id)
+        if current != AWAITING_REVIEW:
+            raise StateError(
+                f"a review applies to a unit in awaiting_review, and {unit_id} is {current}. "
+                "A worker submits its report first."
+            )
+
+        if verdict == "pass" and not evidence:
+            raise StateError(
+                f"{unit_id}: a pass needs at least one piece of evidence (--evidence). "
+                "Quote the real command output or the artifact check you ran; a worker's "
+                "own claim of success is not evidence."
+            )
+        if verdict == "repair_required":
+            if not defects:
+                raise StateError(f"{unit_id}: repair_required needs at least one --defect")
+            if not repairs:
+                raise StateError(
+                    f"{unit_id}: repair_required needs at least one --repair instruction. "
+                    "A defect with no instruction is a complaint, not a review."
+                )
+        if verdict == "human_required":
+            if not question:
+                raise StateError(
+                    f"{unit_id}: human_required needs --question, the exact decision "
+                    "the user has to make"
+                )
+            if not attempted:
+                raise StateError(
+                    f"{unit_id}: human_required needs at least one --attempted, so the next "
+                    "reader does not repeat what already failed"
+                )
+
+        record = {
+            "at": _now(),
+            "verdict": verdict,
+            "evidence": list(evidence or []),
+            "defects": list(defects or []),
+            "repair_instructions": list(repairs or []),
+            "question": question,
+            "attempts_made": list(attempted or []),
+            "impacted_units": list(impacted or []),
+        }
+        node = self.nodes.setdefault(unit_id, {"status": PENDING, "attempts": 0})
+        node.setdefault("reviews", []).append(record)
+        self.transition(unit_id, VERDICT_STATES[verdict], note=verdict)
+        self.event("review", unit_id=unit_id, verdict=verdict)
+        return record
+
+    def reviews(self, unit_id: str) -> list[dict[str, Any]]:
+        return list(self.nodes.get(unit_id, {}).get("reviews", []))
+
+    def unverified_completions(self) -> list[str]:
+        """Completed units with no passing review recorded against them.
+
+        After an interruption a unit can be left marked complete by a write that
+        landed while the review that justified it did not. Treating that as done
+        is how unverified work reaches the units downstream of it.
+        """
+
+        return sorted(
+            unit_id
+            for unit_id, node in self.nodes.items()
+            if node.get("status") == COMPLETED
+            and not any(review.get("verdict") == "pass" for review in node.get("reviews", []))
+        )
 
     # -- events ------------------------------------------------------------
 
