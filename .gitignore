@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Run state and worker progress logs belong to a run, not to the repository.
+.gcl/
+PLAN.md
+
+.env
+.env.*

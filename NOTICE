@@ -1,0 +1,41 @@
+Graph Coder Lite
+Copyright (c) 2026 Graph Coder Lite contributors
+
+This project is a deliberate simplification of Graph Coder, reducing its ten
+phases to four and its eight skills to three. The parts kept are the ones that
+were paid for in failed runs: the dispatch mechanics, the output and progress
+contracts, the single manager review gate, and the scope invariants. The parts
+removed are cold rehearsal, the separate concept and research phases, the split
+between the plan and a compiled graph, the benchmark-scoring router, and the
+SQLite ledger.
+
+Graph Coder
+https://github.com/lucadominguez/graph-coder
+Ported from commit 43b15b9403e6b3359b2b4162c5f89f35e23abd7d
+
+Graph Coder itself derives from the Agent Planning System:
+https://github.com/lucadominguez/agent-planning-system
+
+Both are MIT licensed.
+
+MIT License
+
+Copyright (c) 2026 Graph Coder contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
