@@ -133,7 +133,8 @@ def test_set_refuses_a_worker_completing_itself(project):
     gcl(project, "set", "IU-MIGRATION", "running")
     code, payload = gcl(project, "set", "IU-MIGRATION", "completed")
     assert code == 1
-    assert "only a manager's passing review" in payload["error"]
+    assert "manager verdict" in payload["error"]
+    assert "gcl review" in payload["error"]
 
 
 def test_set_rejects_a_unit_the_plan_does_not_have(project):
@@ -142,8 +143,9 @@ def test_set_rejects_a_unit_the_plan_does_not_have(project):
 
 
 def test_a_completed_dependency_releases_its_dependent(project):
-    for target in ("ready", "running", "awaiting_review", "completed"):
+    for target in ("ready", "running", "awaiting_review"):
         gcl(project, "set", "IU-MIGRATION", target)
+    gcl(project, "review", "IU-MIGRATION", "--verdict", "pass", "--evidence", "make migrate-test")
     _, payload = gcl(project, "status")
     assert "IU-STORE" in payload["frontier"]
 

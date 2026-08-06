@@ -53,8 +53,11 @@ acceptance with descriptions, the output contract, red and green commands, the
 progress protocol, stop conditions, and a report template. Send it verbatim.
 
 **One review, and it is the only gate.** A worker submits a report; its manager
-checks the artifact's contents against the output contract. `gcl set` refuses
-`running -> completed`, so a unit cannot reach done on a worker's own say-so.
+checks the artifact's contents against the output contract. `completed` exists
+only through `gcl review`, which refuses a pass with no evidence, a repair with
+no defect and instruction, and an escalation with no question or account of what
+was already tried. So every completion carries the evidence that justified it,
+by construction rather than by convention.
 
 **The preflight will not let you dispatch the wrong run.** It blocks on a
 placeholder route, which means the workers would run on whatever default the
@@ -89,10 +92,12 @@ gcl init                                  write a starting plan
 gcl check                                 every defect in the plan, in one pass
 gcl status                                states, frontier, what blocks what
 gcl emit [--unit ID]                      packets for the ready units + preflight
-gcl set <unit> <state> [--note ...]       record a transition
+gcl set <unit> <state> [--note ...]       record a transition, never a verdict
+gcl verify <unit>                         gather the evidence a review rests on
+gcl review <unit> --verdict <v> ...       the only path to completed
 gcl route set --model M [--fallback F] [--unit ID] [--evidence E]
 gcl approve --rendered                    bind approval to the unit contracts
-gcl verify <unit>                         gather the evidence a review rests on
+gcl recover [--apply]                     reconcile after an interrupted session
 ```
 
 ## What was removed, and why it was safe
@@ -103,7 +108,7 @@ gcl verify <unit>                         gather the evidence a review rests on
 | Separate concept and research phases | Both were question-asking with heavy schemas around them. Folded into GROUND and PLAN as bounded steps. |
 | The compiled graph artifact | Derived from the units instead, so it cannot drift. |
 | The benchmark-scoring router | What mattered in real runs was refusing to dispatch an unrouted node, not the scoring math. That check stayed. |
-| The SQLite ledger and recovery module | One JSON state file rebuilds the frontier after a reload. |
+| The SQLite ledger | One JSON state file rebuilds the frontier after a reload, and `gcl recover` reopens anything that cannot be shown to have finished. |
 
 What stayed: the three-role authority model, the single manager review gate, the
 full dispatch mechanics, the output and progress contracts, the bounded

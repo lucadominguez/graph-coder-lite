@@ -2,6 +2,33 @@
 
 All notable changes to Graph Coder Lite.
 
+## [Unreleased]
+
+### Fixed
+
+- **A verdict could be recorded without anything justifying it.** The full Graph
+  Coder enforced verdict content in `apply_manager_review`; porting the state
+  machine alone dropped that, so `gcl set <unit> completed` moved a unit to done
+  on nothing, and a `repair_required` could be filed with no defect and no
+  instruction, which sends the worker back with nothing to act on. All three
+  verdict states are now unreachable from `gcl set`. They exist only through
+  `gcl review`, which refuses a pass with no evidence, a repair without both a
+  defect and an instruction, and an escalation without the question and what was
+  already tried. Every completion therefore carries a review record by
+  construction rather than by convention.
+- **An escalation could not say what it stopped.** `human_required` now computes
+  the transitive dependents that are blocked and the independent units that keep
+  running, and reports both, so "this blocks that branch and nothing else" is a
+  computed claim rather than an estimate.
+- **Nothing reconciled an interrupted session.** `gcl recover` names the two
+  things that survive a crash badly: a unit left running whose worker is gone,
+  and a unit marked complete by a write that landed while the review justifying
+  it did not. `--apply` reopens both as failed attempts, preserving the attempt
+  counts. Nothing is ever inferred to have completed.
+- **The plan-drift check could not fire.** `gcl recover` compared the stored plan
+  hash after `sync` had already overwritten it with the current one, so the two
+  values were always equal. Found by the test written for it.
+
 ## [0.1.0] - 2026-08-06
 
 First release. A simplification of Graph Coder at commit `43b15b9`, keeping the

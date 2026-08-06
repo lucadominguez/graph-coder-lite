@@ -9,7 +9,7 @@ write the same file.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass
 
 from gcl.errors import ContractError
@@ -164,6 +164,51 @@ def structural_defects(plan: Plan) -> list[str]:
     if depth > limit:
         defects.append(f"longest dependency chain is {depth}, over the max_depth bound of {limit}")
     return defects
+
+
+def dependents(plan: Plan) -> dict[str, list[str]]:
+    """Map each unit to the units that depend on it."""
+
+    edges: dict[str, list[str]] = defaultdict(list)
+    for unit in plan.units:
+        for dependency in unit.dependencies:
+            edges[dependency].append(unit.unit_id)
+    return edges
+
+
+def blocked_by(plan: Plan, unit_id: str) -> list[str]:
+    """The transitive dependents of a unit, and nothing else.
+
+    Siblings, cousins, and every other independent branch are absent by
+    construction. That is the point: an isolated failure must not stop work that
+    does not depend on it, and the only way to say that honestly is to compute
+    the blast radius rather than estimate it.
+    """
+
+    if unit_id not in plan.unit_ids:
+        raise ContractError(f"unknown unit {unit_id}")
+    edges = dependents(plan)
+    blocked: set[str] = set()
+    queue = deque(edges.get(unit_id, ()))
+    while queue:
+        current = queue.popleft()
+        if current in blocked or current == unit_id:
+            continue
+        blocked.add(current)
+        queue.extend(edges.get(current, ()))
+    return sorted(blocked)
+
+
+def still_runnable(plan: Plan, states: dict[str, str], unit_id: str) -> list[str]:
+    """What keeps running while `unit_id` waits on a human."""
+
+    blocked = set(blocked_by(plan, unit_id)) | {unit_id}
+    return [
+        candidate.unit_id
+        for candidate in plan.units
+        if candidate.unit_id not in blocked
+        and states.get(candidate.unit_id, "pending") not in ("completed", "human_required")
+    ]
 
 
 def frontier(plan: Plan, states: dict[str, str]) -> list[str]:
