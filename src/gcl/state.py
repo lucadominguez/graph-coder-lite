@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from gcl.budget import ROLES
 from gcl.errors import StateError
 
 STATE_DIR = ".gcl"
@@ -240,6 +241,46 @@ class RunState:
             if node.get("status") == COMPLETED
             and not any(review.get("verdict") == "pass" for review in node.get("reviews", []))
         )
+
+    # -- usage -------------------------------------------------------------
+
+    @property
+    def usage(self) -> list[dict[str, Any]]:
+        return self.payload.setdefault("usage", [])
+
+    def record_usage(
+        self,
+        *,
+        role: str,
+        provider: str,
+        model: str,
+        input_tokens: int,
+        output_tokens: int,
+        unit: str = "",
+    ) -> dict[str, Any]:
+        """Persist what a model turn cost.
+
+        The postmortem run could not reconstruct its own spend afterwards, which
+        is why it could not stop. A workflow that cannot measure its principal
+        optimization target cannot enforce it.
+        """
+
+        if role not in ROLES:
+            raise StateError(f"unknown role `{role}`; expected one of {', '.join(sorted(ROLES))}")
+        for name, value in (("input_tokens", input_tokens), ("output_tokens", output_tokens)):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise StateError(f"{name} must be a non-negative integer")
+        record = {
+            "at": _now(),
+            "role": role,
+            "provider": provider.strip().lower(),
+            "model": model,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "unit": unit,
+        }
+        self.usage.append(record)
+        return record
 
     # -- events ------------------------------------------------------------
 

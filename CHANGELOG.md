@@ -4,6 +4,37 @@ All notable changes to Graph Coder Lite.
 
 ## [Unreleased]
 
+### Added
+
+- **A budget that can stop the run.** Every plan now declares `budget`, and
+  `gcl check` refuses one that does not: a run with no budget cannot be stopped
+  when it starts costing more than the work is worth. `frontier_tokens` caps the
+  Director, `worker_tokens` caps the workers together, and
+  `control_plane_share_max` caps the share of the run that directing and
+  reviewing may take, because a control plane that outgrows the work it
+  supervises has stopped paying for itself. A run that spent about a fifth of a
+  weekly frontier allowance on a browser-local notes app is what this is for:
+  the design goal was written as guidance, so nothing enforced it.
+- **A protected provider, budgeted in its own units.** A subscription route has
+  no marginal dollar price, which is exactly why a router that scores dollars
+  spends it freely, so `budget.protected` names a provider and its allowance,
+  and `gcl route set` refuses to put it on a worker route without
+  `--allow-protected`. Workers are the many, and the many are what exhaust a
+  weekly quota. The refusal matches the provider's model families, not its name:
+  the first version compared the string `anthropic` against the route, which
+  passed its own tests and let `claude-sonnet-5` straight through. Driving the
+  CLI is what caught it. A plan can name families the built-in list misses under
+  `budget.protected.models`.
+- **`gcl usage record` and `gcl usage status`.** The run that motivated all of
+  this could not reconstruct its own spend afterwards, which is why it could not
+  stop; a workflow that cannot measure its principal optimization target cannot
+  enforce it. Turns are recorded per role, provider, model, and unit, and totted
+  up the ways a decision actually needs them.
+- **The breaker sits on dispatch.** A breach makes `gcl emit` return no packets
+  at all rather than annotate them, and names the three ways out: simplify what
+  remains, raise the budget deliberately with the user, or stop and finish by
+  hand. Warnings are what the postmortem run already had, and it kept going.
+
 ### Fixed
 
 - **A verdict could be recorded without anything justifying it.** The full Graph

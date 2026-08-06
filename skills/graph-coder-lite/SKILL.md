@@ -98,10 +98,17 @@ gcl route set --model <model> --fallback <model> --evidence <where it came from>
 Record where the choice came from. A model list from the harness is a weaker
 basis than a measured one, and the user is approving a cost estimate built on it.
 
+The plan also declares a `budget`, and `gcl route set` enforces its protected
+provider: a subscription route has no marginal dollar price, so nothing else
+stops a router from spending a weekly allowance on forty worker turns. If a unit
+genuinely needs it, pass `--allow-protected` and say so at approval rather than
+routing around the refusal.
+
 ## 3. APPROVE
 
 Render the complete plan to the user: all six sections, every unit with its full
-contract, the routes, and every unresolved risk.
+contract, the routes, the budget with what its numbers rest on, and every
+unresolved risk.
 
 A summary is not an approval view. If the plan is long, say so and render it
 anyway.
@@ -134,6 +141,7 @@ gcl emit                one packet per ready unit, plus a preflight block
                         stop unless preflight.ready_to_dispatch is true
 spawn                   one subagent per ready unit, whole round in one message
 gcl set <unit> running  record it before relying on it
+gcl usage record ...    what each turn cost, as it finishes
 ```
 
 Send each packet **verbatim**. Paraphrasing is how a scope leaks and how a worker
@@ -171,6 +179,30 @@ gcl review <unit> --verdict human_required --question "..." --attempted "..."
 An escalation reports its own blast radius: the transitive dependents that are
 now blocked, and every independent unit that keeps running.
 
+### Spend is recorded, or the budget is decoration
+
+Record every model turn as it finishes: yours, each manager's, and each worker's.
+
+```text
+gcl usage record --role worker --provider <provider> --model <model> \
+                 --input <tokens> --output <tokens> --unit IU-STORE
+gcl usage status
+```
+
+Take the numbers from the harness's own usage report for that turn. If it
+reports none, say so to the user and record the packet and report sizes as an
+explicit estimate: a rough figure that exists beats an exact one that does not.
+What must not happen is silence. A run that cannot measure its own spend cannot
+be stopped by any budget, which is how a fifth of a weekly frontier allowance
+once went into a browser-local notes app while every warning about it scrolled
+past.
+
+`gcl emit` is the circuit breaker. On a breach it emits nothing at all and names
+what was exceeded. Then take one of three paths with the user: simplify what is
+left, raise the budget deliberately, or stop here and finish by hand. Raising
+the number quietly to clear the stop is the exact failure this mechanism exists
+to catch.
+
 The escalation ladder is bounded and nothing may lengthen it:
 
 ```text
@@ -191,7 +223,9 @@ and the exact decision the user has to make.
 - spawning a dependent unit before its predecessor's artifacts exist;
 - spawning headless, so no worker is visible or monitorable;
 - dispatching packets that still carry a placeholder route;
-- moving a unit to `completed` on the worker's own say-so.
+- moving a unit to `completed` on the worker's own say-so;
+- running the whole graph without recording a single turn's usage;
+- raising the budget yourself to clear a stop instead of putting it to the user.
 
 ## Commands
 
@@ -204,6 +238,8 @@ gcl set <unit> <state> [--note ...]       record a transition, never a verdict
 gcl verify <unit>                         gather the evidence a review rests on
 gcl review <unit> --verdict <v> ...       the only path to completed
 gcl route set --model M [--fallback F] [--unit ID] [--evidence E]
+gcl usage record --role R --provider P --model M --input N --output N [--unit ID]
+gcl usage status                          spend by role, provider, and unit
 gcl approve --rendered                    bind approval to the unit contracts
 gcl recover [--apply]                     reconcile after an interrupted session
 ```
@@ -226,6 +262,6 @@ key in chat, a command, the plan, or a tracked file.
 A harness with no way to spawn subagents; product ambiguity only the user can
 settle; a plan that cannot pass `gcl check`; a unit whose acceptance cannot be
 verified; no model available that meets a unit's needs; a request to approve
-without rendering the full plan; a material change after approval; a destructive
-operation without authorization; secret exposure; or an exhausted escalation
-ladder.
+without rendering the full plan; a material change after approval; a budget
+breach, which is the user's decision and never yours; a destructive operation
+without authorization; secret exposure; or an exhausted escalation ladder.

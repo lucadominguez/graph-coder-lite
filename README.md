@@ -63,6 +63,50 @@ by construction rather than by convention.
 placeholder route, which means the workers would run on whatever default the
 harness supplies, and on a plan that was never approved.
 
+**The budget is a circuit breaker, not an intention.** Every plan declares one,
+every model turn is recorded against it, and a breach makes `gcl emit` emit
+nothing rather than warn. See below.
+
+## The budget
+
+A run once spent about a fifth of a weekly frontier allowance producing a
+browser-local notes app. The code was fine. What failed is that the design goal,
+spend premium reasoning once and let cheap models execute, was written as
+guidance, and nothing recorded what was being spent, so nothing could notice.
+
+```yaml
+budget:
+  frontier_tokens: 250000        # what the Director may spend planning and directing
+  worker_tokens: 1500000         # what all workers together may spend implementing
+  control_plane_share_max: 0.35  # the largest share of the run overhead may be
+  protected:
+    provider: anthropic          # budgeted in its own tokens, never traded for price
+    tokens: 300000               # 0 bars the provider from this run entirely
+    models: [in-house-7b]        # optional, for families the built-in list misses
+```
+
+**Dollars are not the scarce resource.** A subscription route has no marginal
+dollar price, which is exactly why a router that scores dollars spends it
+freely. A weekly quota is finite, and running out of it costs the user their
+week rather than a few cents. The protected provider is budgeted in its own
+units, and `gcl route set` refuses to put it on a worker route without
+`--allow-protected`: workers are the many, and the many exhaust an allowance. It
+matches the provider's model families rather than its name, because a route says
+`claude-sonnet-5` and never says `anthropic`.
+
+**The control plane is overhead, not work.** Directing, reviewing, and
+monitoring produce no artifact. When they pass `control_plane_share_max` of
+everything spent, the run has stopped being worth its own supervision.
+
+```sh
+gcl usage record --role worker --provider openai --model gpt-x \
+                 --input 12000 --output 3000 --unit IU-STORE
+gcl usage status          # spend by role, provider, and unit, against the caps
+```
+
+Every breach is a hard stop, because a warning is what the run that motivated
+this already had.
+
 ## The unit contract
 
 Nineteen fields, all load-bearing. Three of them are the ones people skip:
@@ -96,6 +140,8 @@ gcl set <unit> <state> [--note ...]       record a transition, never a verdict
 gcl verify <unit>                         gather the evidence a review rests on
 gcl review <unit> --verdict <v> ...       the only path to completed
 gcl route set --model M [--fallback F] [--unit ID] [--evidence E]
+gcl usage record --role R --provider P --model M --input N --output N [--unit ID]
+gcl usage status                          spend against the budget, and whether to stop
 gcl approve --rendered                    bind approval to the unit contracts
 gcl recover [--apply]                     reconcile after an interrupted session
 ```
@@ -107,7 +153,7 @@ gcl recover [--apply]                     reconcile after an interrupted session
 | Cold rehearsal, and the double pass for high-risk units | A whole phase of agents reading packets to predict problems. The manager review catches the same defects against real artifacts. |
 | Separate concept and research phases | Both were question-asking with heavy schemas around them. Folded into GROUND and PLAN as bounded steps. |
 | The compiled graph artifact | Derived from the units instead, so it cannot drift. |
-| The benchmark-scoring router | What mattered in real runs was refusing to dispatch an unrouted node, not the scoring math. That check stayed. |
+| The benchmark-scoring router | What mattered in real runs was refusing to dispatch an unrouted node, not the scoring math. That check stayed, and cost control moved to the budget, which measures what was actually spent instead of predicting it. |
 | The SQLite ledger | One JSON state file rebuilds the frontier after a reload, and `gcl recover` reopens anything that cannot be shown to have finished. |
 
 What stayed: the three-role authority model, the single manager review gate, the

@@ -20,6 +20,7 @@ from typing import Any
 
 import yaml
 
+from gcl import budget as budget_module
 from gcl.errors import ContractError, PlanError
 
 #: Routes that mean "nothing was routed here". A plan may carry one while it is
@@ -91,6 +92,7 @@ class Plan:
     approved: bool
     approval: dict[str, Any]
     bounds: dict[str, Any]
+    budget: dict[str, Any]
     requirements: tuple[dict[str, Any], ...]
     acceptance: tuple[dict[str, Any], ...]
     managers: tuple[dict[str, Any], ...]
@@ -209,6 +211,7 @@ def parse(text: str, *, source: Path | None = None) -> Plan:
         approved=bool(meta.get("approved", False)),
         approval=dict(meta.get("approval") or {}),
         bounds=dict(meta.get("bounds") or {}),
+        budget=dict(meta.get("budget") or {}),
         requirements=tuple(meta.get("requirements") or []),
         acceptance=tuple(meta.get("acceptance") or []),
         managers=tuple(meta.get("managers") or []),
@@ -334,6 +337,7 @@ def readiness_defects(plan: Plan) -> list[str]:
         )
 
     defects.extend(_bounds_defects(plan))
+    defects.extend(budget_module.defects(plan.budget))
     return defects
 
 

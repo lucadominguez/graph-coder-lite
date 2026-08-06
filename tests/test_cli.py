@@ -6,6 +6,8 @@ import io
 import json
 from contextlib import redirect_stdout
 
+import pytest
+
 from gcl.cli import main
 
 
@@ -83,6 +85,139 @@ class TestRouteSet:
         assert payload["evidence"] == "harness_model_list"
         state = json.loads((project / ".gcl" / "state.json").read_text(encoding="utf-8"))
         assert state["events"][-1]["evidence"] == "harness_model_list"
+
+    def test_the_protected_provider_is_refused_on_a_worker_route(self, project):
+        # The example plan protects `anthropic`, and a route names a model, not
+        # a provider. Driving the real CLI is what showed that matching on the
+        # word `anthropic` refused nothing anyone would actually type.
+        code, payload = gcl(project, "route", "set", "--model", "claude-sonnet-5")
+        assert code == 1
+        assert "anthropic" in payload["error"]
+        assert "--allow-protected" in payload["error"]
+
+    def test_a_fallback_cannot_smuggle_it_in_either(self, project):
+        code, payload = gcl(
+            project, "route", "set", "--model", "m1", "--fallback", "claude-haiku-4-5"
+        )
+        assert code == 1 and "budget protects" in payload["error"]
+
+    def test_an_unprotected_route_is_untouched(self, project):
+        code, payload = gcl(project, "route", "set", "--model", "gpt-5", "--fallback", "gemini-3")
+        assert code == 0 and payload["routed"]
+
+    def test_it_can_still_be_spent_deliberately(self, project):
+        code, payload = gcl(
+            project, "route", "set", "--model", "claude-sonnet-5", "--allow-protected"
+        )
+        assert code == 0 and payload["routed"]
+
+
+class TestUsage:
+    def test_a_run_can_report_what_it_has_spent(self, project):
+        gcl(
+            project,
+            "usage",
+            "record",
+            *"--role director --provider openai".split(),
+            "--model",
+            "gpt-x",
+            "--input",
+            "1000",
+            "--output",
+            "500",
+        )
+        gcl(
+            project,
+            "usage",
+            "record",
+            *"--role worker --provider openai".split(),
+            "--model",
+            "gpt-mini",
+            "--input",
+            "2000",
+            "--output",
+            "1000",
+            "--unit",
+            "IU-STORE",
+        )
+        code, payload = gcl(project, "usage", "status")
+        assert code == 0
+        assert payload["turns_recorded"] == 2
+        assert payload["by_unit"] == {"IU-STORE": 3000}
+        assert payload["budget"]["spent"]["by_role"] == {"director": 1500, "worker": 3000}
+        assert payload["budget"]["stop"] is False
+
+    def test_an_unknown_role_is_refused_at_the_boundary(self, project):
+        with pytest.raises(SystemExit):
+            gcl(
+                project,
+                "usage",
+                "record",
+                "--role",
+                "intern",
+                "--provider",
+                "openai",
+                "--model",
+                "gpt-x",
+                "--input",
+                "1",
+                "--output",
+                "1",
+            )
+
+    def test_a_breach_stops_dispatch_instead_of_warning_about_it(self, project):
+        gcl(project, "route", "set", "--model", "m1", "--fallback", "m2")
+        gcl(project, "approve", "--rendered")
+        _, before = gcl(project, "emit")
+        assert before["preflight"]["ready_to_dispatch"] is True and before["spawn"]
+
+        gcl(
+            project,
+            "usage",
+            "record",
+            "--role",
+            "director",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-x",
+            "--input",
+            "300000",
+            "--output",
+            "1",
+            "--unit",
+            "IU-STORE",
+        )
+        code, payload = gcl(project, "emit")
+        assert code == 0
+        assert payload["spawn"] == []
+        assert payload["preflight"]["ready_to_dispatch"] is False
+        assert payload["preflight"]["stopped_by_budget"] is True
+        assert payload["queued"] == ["IU-MIGRATION", "IU-SCHEMA"]
+        assert payload["preflight"]["warnings"][0].startswith("BUDGET:")
+        assert "raise the budget silently" in payload["next"]
+
+    def test_the_protected_allowance_is_its_own_breach(self, project):
+        gcl(project, "route", "set", "--model", "m1")
+        gcl(project, "approve", "--rendered")
+        gcl(
+            project,
+            "usage",
+            "record",
+            "--role",
+            "worker",
+            "--provider",
+            "Anthropic",
+            "--model",
+            "claude",
+            "--input",
+            "400000",
+            "--output",
+            "0",
+        )
+        _, payload = gcl(project, "emit")
+        assert payload["budget"]["protected"]["spent"] == 400000
+        assert payload["spawn"] == []
 
 
 class TestApprove:
