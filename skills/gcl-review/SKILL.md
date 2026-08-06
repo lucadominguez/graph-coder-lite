@@ -100,6 +100,21 @@ may do, and the escalation threshold.
 Advice never contains a patch, a diff, or replacement code. Describing a fix in
 enough detail that the worker can write it is advice. Writing it is not.
 
+## Your own turns are overhead, and they are counted
+
+Reviewing and advising produce no artifact. The plan's `budget` caps the share of
+the run that the control plane may take, and your turns are in it, so report what
+each one cost to the Director or record it yourself:
+
+```text
+gcl usage record --role manager --provider <provider> --model <model> \
+                 --input <tokens> --output <tokens> --unit IU-STORE
+```
+
+An unrecorded turn is not a free one. It is a turn the budget cannot see, and a
+budget that cannot see the control plane is the one that let supervision outgrow
+the work it was supervising.
+
 ## Context
 
 A child may ask for context: what it needs, why, which paths, and what is

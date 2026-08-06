@@ -17,8 +17,9 @@ scopes, and route, so nothing is compiled into a second artifact that can drift.
 
 ## Structure
 
-YAML frontmatter carries the machine-checked contract: `bounds`, `requirements`,
-`acceptance`, `managers`, and `units`. The body carries six sections, in order:
+YAML frontmatter carries the machine-checked contract: `bounds`, `budget`,
+`requirements`, `acceptance`, `managers`, and `units`. The body carries six
+sections, in order:
 
 ```text
 1. Goal and Requirements     what and why, plus explicit non-goals
@@ -35,6 +36,49 @@ The plan `gcl init` writes is a complete working example that passes
 Refinement is monotonic in substance. Later work adds specificity, evidence,
 constraints, and tests. Deleting or weakening an acceptance criterion, a scope, or
 a unit needs a recorded reason and voids approval. Rewording does not.
+
+## The budget is a circuit breaker, not an intention
+
+Every plan declares one. `gcl check` refuses a plan without it, because a run
+with no budget cannot be stopped when it starts costing more than the work is
+worth.
+
+```yaml
+budget:
+  frontier_tokens: 250000        # what the Director may spend planning and directing
+  worker_tokens: 1500000         # what all workers together may spend implementing
+  control_plane_share_max: 0.35  # the largest share of the run overhead may be
+  protected:
+    provider: anthropic          # budgeted in its own tokens, never traded for price
+    tokens: 300000               # 0 bars the provider from this run entirely
+    models: [in-house-7b]        # optional, for families the built-in list misses
+```
+
+A run once spent about a fifth of a weekly frontier allowance producing a
+browser-local notes app. The code was fine. What failed is that the design goal,
+spend premium reasoning once and let cheap models execute, was written as
+guidance, and nothing recorded what was being spent, so nothing could notice.
+
+Two things follow, and both are why the numbers above are shaped the way they
+are.
+
+- **Dollars are not the scarce resource.** A subscription route has no marginal
+  dollar price, which is exactly why a router scoring dollars spends it freely.
+  A weekly quota is finite and running out costs the user their week, not a few
+  cents. Name that provider under `protected` and give it its own allowance.
+  `gcl route set` then refuses to put it on a worker route, because workers are
+  the many and the many are what exhaust an allowance. It matches the provider's
+  model families, not just its name: a route says `claude-sonnet-5`, never
+  `anthropic`. Name anything it would miss under `protected.models`.
+- **The control plane is overhead, not work.** Directing, reviewing, and
+  monitoring produce no artifact. `control_plane_share_max` is the point past
+  which the run has stopped being worth its own supervision.
+
+Size the numbers against this change, not against a round figure: estimate from
+the unit count, the size of each unit's read scope, and the routes. Say in
+section 5 or 6 what the estimate rests on, so the user is approving a number
+with a basis. Every breach stops dispatch, so a budget set carelessly low is a
+run that halts, and one set carelessly high is no budget at all.
 
 ## The unit contract
 
@@ -148,7 +192,8 @@ reviewer agent, a review unit, or a second-opinion pass.
 - every command is runnable on the target platform as written;
 - every load-bearing claim cites a file, symbol, command result, or dated source;
 - every risk has a mitigation or an explicit acceptance;
-- the baseline failure set is recorded, so new failures are distinguishable.
+- the baseline failure set is recorded, so new failures are distinguishable;
+- the budget is sized against this change, and what it rests on is written down.
 
 Unknowns become bounded `explore` units or questions for the user. Never invent a
 file, an API, or a test result. Never assert a command passes without its output.

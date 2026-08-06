@@ -87,3 +87,39 @@ def test_every_transition_leaves_an_event(state):
     assert state.events[-1]["kind"] == "state"
     assert state.events[-1]["to"] == "ready"
     assert state.events[-1]["note"] == "frontier"
+
+
+class TestUsageSurvivesTheRun:
+    def test_a_turn_is_recorded_with_what_it_cost(self, state):
+        state.record_usage(
+            role="worker",
+            provider="OpenAI",
+            model="gpt-x",
+            input_tokens=10,
+            output_tokens=4,
+            unit="IU-A",
+        )
+        assert state.usage[-1]["provider"] == "openai"  # normalized, so totals add up
+        assert state.usage[-1]["input_tokens"] == 10
+
+    def test_it_reloads_from_the_file_like_everything_else(self, tmp_path):
+        run = RunState.load(tmp_path)
+        run.sync(["IU-A"], plan_id="P-x", plan_hash="sha256:x")
+        run.record_usage(
+            role="director", provider="openai", model="gpt-x", input_tokens=1, output_tokens=2
+        )
+        run.save()
+        assert len(RunState.load(tmp_path).usage) == 1
+
+    def test_a_role_the_budget_does_not_know_is_refused(self, state):
+        with pytest.raises(StateError, match="unknown role"):
+            state.record_usage(
+                role="intern", provider="openai", model="gpt-x", input_tokens=1, output_tokens=1
+            )
+
+    @pytest.mark.parametrize("bad", [-1, 1.5, True, "900"])
+    def test_tokens_must_be_a_non_negative_integer(self, state, bad):
+        with pytest.raises(StateError, match="non-negative integer"):
+            state.record_usage(
+                role="worker", provider="openai", model="gpt-x", input_tokens=bad, output_tokens=0
+            )

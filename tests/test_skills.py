@@ -190,6 +190,34 @@ class TestContractsThatMakeWorkersCheap:
         assert "pays for its context twice" in orchestrator
 
 
+class TestTheBudgetIsEnforcedNotIntended:
+    """A run spent a fifth of a weekly allowance on a notes app. These are why."""
+
+    def test_the_planner_makes_a_budget_mandatory_with_its_reason(self, planner):
+        assert "circuit breaker, not an intention" in planner
+        assert "control_plane_share_max" in planner
+        assert "cannot be stopped when it starts costing more than the work is worth" in planner
+
+    def test_the_protected_provider_is_explained_by_why_price_fails(self, planner, orchestrator):
+        for text in (planner, orchestrator):
+            assert "no marginal dollar price" in text
+        assert "weekly quota is finite" in planner
+        assert "--allow-protected" in orchestrator
+
+    def test_the_control_plane_is_named_as_overhead(self, planner, reviewer):
+        assert "overhead, not work" in planner
+        assert "your turns are in it" in reviewer
+
+    def test_spend_must_be_recorded_as_it_happens(self, orchestrator, reviewer):
+        assert "gcl usage record" in orchestrator and "gcl usage record" in reviewer
+        assert "cannot measure its own spend cannot be stopped" in orchestrator
+        assert "An unrecorded turn is not a free one" in reviewer
+
+    def test_clearing_a_stop_alone_is_named_as_a_failed_execution(self, orchestrator):
+        assert "raising the budget yourself to clear a stop" in orchestrator
+        assert "never yours" in orchestrator
+
+
 class TestGates:
     def test_completion_requires_a_passing_review(self, orchestrator):
         assert "a worker that says it is done is not done" in orchestrator.lower()
@@ -213,17 +241,22 @@ class TestGates:
         assert "green build is not evidence" in orchestrator
 
 
-def test_every_command_the_orchestrator_names_exists(orchestrator):
+def test_every_command_the_orchestrator_names_exists():
+    """Read the file unwrapped: the collapsed fixture is one line, so a line-wise
+    check against it silently sees a single token and passes on nothing."""
+
     from gcl.cli import build_parser
 
     parser = build_parser()
     known = set()
     for action in parser._subparsers._group_actions:  # noqa: SLF001
         known.update(action.choices)
-    block = orchestrator.split("## Commands")[1].split("```")[1]
-    named = {line.split()[0] for line in block.strip().splitlines() if line.startswith("gcl ")}
-    # `gcl route set` is a subcommand; the top-level name is what is registered.
-    assert {name.split()[-1] for name in named} <= known | {"gcl"}
+    block = raw("graph-coder-lite/SKILL.md").split("## Commands")[1].split("```")[1]
+    # `gcl route set` and `gcl usage record` are subcommands; the word after
+    # `gcl` is the one that has to be registered.
+    named = {line.split()[1] for line in block.strip().splitlines() if line.startswith("gcl ")}
+    assert named
+    assert named <= known
 
 
 def test_no_em_dashes_in_any_skill(every_skill, dispatch):

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from gcl import budget as budget_module
 from gcl import graph as graph_module
 from gcl import packet as packet_module
 from gcl import plan as plan_module
@@ -98,13 +99,70 @@ def cmd_emit(args: argparse.Namespace) -> dict[str, Any]:
         flight.setdefault("warnings", []).insert(
             0, f"the plan has {len(defects)} unresolved defects; run `gcl check`"
         )
+
+    # The circuit breaker. A breach stops dispatch rather than annotating it: the
+    # run this exists for had its warnings and kept going.
+    spend = budget_module.assess(plan.budget, budget_module.Ledger.from_events(state.usage))
+    if spend["stop"]:
+        flight["ready_to_dispatch"] = False
+        units, queued = [], sorted(spawn_ids + queued)
+        flight.setdefault("warnings", [])[:0] = [
+            "BUDGET: " + breach for breach in spend["breaches"]
+        ]
+        flight["stopped_by_budget"] = True
+
     state.save()
-    return {
+    payload = {
         "ok": True,
         "preflight": flight,
+        "budget": spend,
         "spawn": packet_module.emit(plan, units),
         "queued": queued,
         "max_active_workers": plan.max_active_workers,
+    }
+    if spend["stop"]:
+        payload["next"] = (
+            "Nothing was emitted. Take one of: simplify the remaining units, raise the "
+            "budget deliberately with the user, or stop here and finish by hand. Do not "
+            "raise the budget silently to get past this."
+        )
+    return payload
+
+
+def cmd_usage(args: argparse.Namespace) -> dict[str, Any]:
+    """Record what a turn cost, or report what the run has spent so far."""
+
+    plan = _load(args)
+    state = RunState.load(Path(args.root))
+
+    if args.usage_command == "record":
+        try:
+            record = state.record_usage(
+                role=args.role,
+                provider=args.provider,
+                model=args.model,
+                input_tokens=args.input,
+                output_tokens=args.output,
+                unit=args.unit or "",
+            )
+        except StateError as error:
+            raise GclError(str(error)) from error
+        state.save()
+        spend = budget_module.assess(plan.budget, budget_module.Ledger.from_events(state.usage))
+        return {"ok": True, "recorded": record, "budget": spend}
+
+    ledger = budget_module.Ledger.from_events(state.usage)
+    spend = budget_module.assess(plan.budget, ledger)
+    return {
+        "ok": not spend["stop"],
+        "turns_recorded": len(state.usage),
+        "by_unit": dict(sorted(ledger.by_unit.items())),
+        "budget": spend,
+        "next": (
+            "Dispatch is blocked until this is resolved with the user."
+            if spend["stop"]
+            else "Within budget."
+        ),
     }
 
 
@@ -257,6 +315,24 @@ def cmd_route_set(args: argparse.Namespace) -> dict[str, Any]:
 
     path = _plan_path(args)
     plan = plan_module.load(path)
+
+    # A subscription route has no marginal dollar price, which is exactly why a
+    # cost-scored router spends it freely. When the user names a provider as the
+    # protected resource, it is barred from worker routes outright: workers are
+    # the many, and the many are what exhaust a weekly allowance.
+    protected = budget_module.protected_provider(plan.budget)
+    if protected and not args.allow_protected:
+        for candidate in (args.model, args.fallback):
+            if candidate and budget_module.names_protected(candidate, plan.budget):
+                raise GclError(
+                    f"`{candidate}` is a model of `{protected}`, the provider this plan's "
+                    "budget protects from worker routes. Route them to an unprotected "
+                    "model. If you genuinely mean to spend the protected allowance here, "
+                    "pass --allow-protected and say so at approval. If the match is wrong, "
+                    "the families it knows are in gcl/budget.py and a plan can name its own "
+                    "under budget.protected.models."
+                )
+
     targets = args.unit or [
         unit.unit_id for unit in plan.units if not unit.is_routed or args.overwrite
     ]
@@ -446,7 +522,26 @@ def build_parser() -> argparse.ArgumentParser:
     route_set.add_argument(
         "--evidence", default="operator", help="where this choice came from, recorded as-is"
     )
+    route_set.add_argument(
+        "--allow-protected",
+        action="store_true",
+        help="deliberately spend the protected provider's allowance on these units",
+    )
     route_set.set_defaults(handler=cmd_route_set)
+
+    usage = commands.add_parser("usage", help="observed spend against the budget").add_subparsers(
+        dest="usage_command", required=True
+    )
+    record = usage.add_parser("record", help="persist what one model turn cost")
+    record.add_argument("--role", required=True, choices=sorted(budget_module.ROLES))
+    record.add_argument("--provider", required=True)
+    record.add_argument("--model", required=True)
+    record.add_argument("--input", type=int, required=True, help="input tokens")
+    record.add_argument("--output", type=int, required=True, help="output tokens")
+    record.add_argument("--unit", help="the unit this turn was spent on")
+    record.set_defaults(handler=cmd_usage)
+    status_usage = usage.add_parser("status", help="spend by role, provider, and unit")
+    status_usage.set_defaults(handler=cmd_usage)
 
     approve = commands.add_parser("approve", help="bind approval to the unit contracts")
     approve.add_argument(

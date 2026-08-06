@@ -11,6 +11,14 @@ bounds:
   max_depth: 6
   cost_ceiling: 4.0
 
+budget:
+  frontier_tokens: 250000
+  worker_tokens: 1500000
+  control_plane_share_max: 0.35
+  protected:
+    provider: anthropic
+    tokens: 300000
+
 requirements:
   - id: R-REVOKE
     description: An operator can revoke a single API token, and it stops authenticating on the next request.
@@ -235,3 +243,9 @@ against its artifact rather than against its existence.
   starts.
 - If `IU-MIGRATION` reaches `human_required`, `IU-STORE` and `IU-ENDPOINT` are
   blocked with it. `IU-SCHEMA` is independent and keeps running.
+- **The run costs more than the change is worth.** The `budget` block is the
+  circuit breaker: 250k Director tokens for planning and direction, 1.5M for the
+  four workers, and a cap of 35% on the control plane's share of everything
+  spent. `anthropic` is the protected provider, budgeted in its own tokens
+  because a subscription has no marginal price and a cost-scored router will
+  therefore spend it freely. A breach stops `gcl emit` rather than warning it.
