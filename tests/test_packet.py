@@ -39,6 +39,12 @@ def test_a_unit_with_no_output_contract_says_so_rather_than_inventing_one(mutate
 
 
 class TestProgressProtocol:
+    def test_transcript_access_is_harness_dependent(self, example_text):
+        content = build(example_text, "IU-STORE")
+        assert "transcript access depends on the harness" in content
+        assert "Keep the progress log current" in content
+        assert "transcript cannot be read" not in content
+
     def test_an_incremental_unit_is_told_not_to_buffer(self, example_text):
         content = build(example_text, "IU-STORE")
         assert "each function, then each test" in content

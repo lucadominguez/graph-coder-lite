@@ -56,9 +56,8 @@ def output_contract_block(unit: Unit) -> str:
 def progress_block(unit: Unit) -> str:
     """Tell the worker how to be legible from outside while it runs.
 
-    A running worker's transcript cannot be read, so the Director watching it has
-    the filesystem and nothing else. A worker that buffers all its output to the
-    end looks exactly like one that is stuck.
+    Transcript access varies by harness. Durable checkpoints make progress
+    observable even when live context is unavailable, and survive a reload.
     """
 
     contract = unit.progress_contract or {}
@@ -81,7 +80,7 @@ def progress_block(unit: Unit) -> str:
     else:
         lines.append(
             "This unit writes its output once, in a single pass, so the progress log is the "
-            "only sign of life you emit. Keep it current."
+            "persistent progress record. Keep it current."
         )
     if isinstance(timeout, int) and not isinstance(timeout, bool) and timeout > 0:
         lines.append(
@@ -91,8 +90,8 @@ def progress_block(unit: Unit) -> str:
             "report, and will be cancelled as hung rather than waited on."
         )
     lines.append(
-        "Your transcript cannot be read while you run, so these are the only signs that you "
-        "are making progress, and a long silent stretch is read as a stall."
+        "Live transcript access depends on the harness. Keep the progress log current "
+        "even if the Director can read your live output; checkpoints must survive a reload."
     )
     return " ".join(lines)
 

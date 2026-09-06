@@ -6,64 +6,46 @@ All notable changes to Graph Coder Lite.
 
 ### Added
 
-- **A budget that can stop the run.** Every plan now declares `budget`, and
-  `gcl check` refuses one that does not: a run with no budget cannot be stopped
-  when it starts costing more than the work is worth. `frontier_tokens` caps the
-  Director, `worker_tokens` caps the workers together, and
-  `control_plane_share_max` caps the share of the run that directing and
-  reviewing may take, because a control plane that outgrows the work it
-  supervises has stopped paying for itself. A run that spent about a fifth of a
-  weekly frontier allowance on a browser-local notes app is what this is for:
-  the design goal was written as guidance, so nothing enforced it.
-- **A protected provider, budgeted in its own units.** A subscription route has
-  no marginal dollar price, which is exactly why a router that scores dollars
-  spends it freely, so `budget.protected` names a provider and its allowance,
-  and `gcl route set` refuses to put it on a worker route without
-  `--allow-protected`. Workers are the many, and the many are what exhaust a
-  weekly quota. The refusal matches the provider's model families, not its name:
-  the first version compared the string `anthropic` against the route, which
-  passed its own tests and let `claude-sonnet-5` straight through. Driving the
-  CLI is what caught it. A plan can name families the built-in list misses under
-  `budget.protected.models`.
-- **`gcl usage record` and `gcl usage status`.** The run that motivated all of
-  this could not reconstruct its own spend afterwards, which is why it could not
-  stop; a workflow that cannot measure its principal optimization target cannot
-  enforce it. Turns are recorded per role, provider, model, and unit, and totted
-  up the ways a decision actually needs them.
-- **The breaker sits on dispatch.** A breach makes `gcl emit` return no packets
-  at all rather than annotate them, and names the three ways out: simplify what
-  remains, raise the budget deliberately with the user, or stop and finish by
-  hand. Warnings are what the postmortem run already had, and it kept going.
+- Plans declare `budget`: Director tokens, combined worker tokens, maximum
+  supervision share and optional protected-provider quotas. `gcl check` rejects
+  a missing budget.
+- `gcl usage record` stores usage by role, provider, model and unit;
+  `gcl usage status` compares recorded totals with the limits. Usage must be
+  supplied by the Director or harness, not automatically collected by the CLI.
+- `gcl emit` returns no packets when recorded spending breaches a limit. The user
+  can reduce scope, explicitly raise the budget, or stop. It does not cancel
+  provider requests already in flight.
+- Protected models need `--allow-protected` before assignment to worker routes.
+  Matching covers model families as well as provider names;
+  `budget.protected.models` adds names the built-in aliases do not recognize.
 
 ### Fixed
 
-- **A verdict could be recorded without anything justifying it.** The full Graph
-  Coder enforced verdict content in `apply_manager_review`; porting the state
-  machine alone dropped that, so `gcl set <unit> completed` moved a unit to done
-  on nothing, and a `repair_required` could be filed with no defect and no
-  instruction, which sends the worker back with nothing to act on. All three
-  verdict states are now unreachable from `gcl set`. They exist only through
-  `gcl review`, which refuses a pass with no evidence, a repair without both a
-  defect and an instruction, and an escalation without the question and what was
-  already tried. Every completion therefore carries a review record by
-  construction rather than by convention.
-- **An escalation could not say what it stopped.** `human_required` now computes
-  the transitive dependents that are blocked and the independent units that keep
-  running, and reports both, so "this blocks that branch and nothing else" is a
-  computed claim rather than an estimate.
-- **Nothing reconciled an interrupted session.** `gcl recover` names the two
-  things that survive a crash badly: a unit left running whose worker is gone,
-  and a unit marked complete by a write that landed while the review justifying
-  it did not. `--apply` reopens both as failed attempts, preserving the attempt
-  counts. Nothing is ever inferred to have completed.
-- **The plan-drift check could not fire.** `gcl recover` compared the stored plan
-  hash after `sync` had already overwritten it with the current one, so the two
-  values were always equal. Found by the test written for it.
+- Verdict states are reachable only through `gcl review`, not `gcl set`. A pass
+  requires evidence, repair requires a defect and instruction, and escalation
+  requires a question and previous attempts.
+- `human_required` reports blocked transitive dependents and independent units
+  that can continue.
+- `gcl recover --apply` reopens interrupted work and completions lacking review
+  evidence, preserving attempt counts. Plan drift is checked before state sync
+  replaces the stored hash.
+- Worker packets retain durable progress requirements without claiming live
+  transcripts are unavailable in every harness. A regression test checks this.
+- Skill checks now protect monitoring and usage requirements rather than
+  requiring the wording of historical anecdotes.
+
+### Documentation
+
+- Reworked the introduction, installation steps and unit-contract explanation.
+- Made manual usage accounting, structured-review limits and the lack of an
+  automatic worker launcher explicit.
+- Described removal of rehearsal as a trade-off, not proof that later review
+  catches all the same defects. No end-to-end savings benchmark is claimed.
 
 ## [0.1.0] - 2026-08-06
 
-First release. A simplification of Graph Coder at commit `43b15b9`, keeping the
-rules that were paid for in failed runs and removing the phases that were not.
+First release. A smaller workflow derived from Graph Coder at commit `43b15b9`,
+with fewer phases and a JSON state store.
 
 ### The structure
 
@@ -80,8 +62,8 @@ rules that were paid for in failed runs and removing the phases that were not.
 ### Removed
 
 - **Cold rehearsal**, including the two independent passes for high-risk units.
-  A whole phase of fresh agents reading packets to predict problems, when the
-  manager review finds the same defects against artifacts that actually exist.
+  Packet problems may surface later in implementation or manager review; the
+  two checks have not been shown to catch identical defects.
 - **The separate concept and research phases**, with their third-party workflow
   selection, Product Contract normalization, question-inventory schema, and claim
   schema. Both were question-asking wrapped in ceremony; they are now bounded
@@ -100,7 +82,7 @@ rules that were paid for in failed runs and removing the phases that were not.
 
 ### Kept
 
-Every one of these corresponds to a run that failed without it.
+These operational requirements remain in Lite:
 
 - The three-role authority model, and a manager review as the only path to
   `completed`. The state machine has no `running -> completed` transition, so a
@@ -108,8 +90,8 @@ Every one of these corresponds to a run that failed without it.
 - `output_contract`: what has to be inside the artifact. A unit gated only by
   acceptance prose is satisfied by a scraper that returns nothing.
 - `progress_contract`: `checkpoint_every`, `writes_incrementally`, and
-  `command_timeout_seconds`. A running worker's transcript cannot be read, so
-  without a declared cadence a long job and a dead loop look identical, and a
+  `command_timeout_seconds`. Transcript access depends on the harness. Without
+  a declared cadence a long job and a dead loop can look identical on disk, and a
   worker inside an unbounded blocking call cannot report or be told apart from a
   hung one.
 - The full dispatch mechanics: narrow swarm cleanup rather than the global

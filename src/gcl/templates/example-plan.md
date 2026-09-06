@@ -194,6 +194,11 @@ units:
 
 ## 1. Goal and Requirements
 
+> **Illustrative example, not repository evidence.** This plan describes a fictional
+> token service. File paths, line numbers, baseline test counts and verification
+> statements below are sample values, not results measured in your project. Replace
+> them with inspected facts and real command output before seeking approval.
+
 Operators can currently issue API tokens but not withdraw one. A leaked token is
 live until it expires. This adds immediate revocation with an audit trail.
 
@@ -243,9 +248,9 @@ against its artifact rather than against its existence.
   starts.
 - If `IU-MIGRATION` reaches `human_required`, `IU-STORE` and `IU-ENDPOINT` are
   blocked with it. `IU-SCHEMA` is independent and keeps running.
-- **The run costs more than the change is worth.** The `budget` block is the
-  circuit breaker: 250k Director tokens for planning and direction, 1.5M for the
-  four workers, and a cap of 35% on the control plane's share of everything
-  spent. `anthropic` is the protected provider, budgeted in its own tokens
-  because a subscription has no marginal price and a cost-scored router will
-  therefore spend it freely. A breach stops `gcl emit` rather than warning it.
+- **Budget example.** The `budget` block allows 250k Director tokens for planning
+  and direction, 1.5M worker tokens, and a control-plane share of at most 35%.
+  `anthropic` is an example protected provider with its own token allowance.
+  These are illustrative limits, not measured costs or recommended settings for
+  every project. `gcl emit` stops when recorded usage breaches a limit; missing
+  usage records leave the budget check incomplete.

@@ -7,8 +7,8 @@ description: Use when a software change should be planned once and then implemen
 Invocation is `/graph-coder-lite`. Run it from the root session, which holds the
 Director role for the whole run.
 
-Four phases. Plan once with real effort, dispatch the work to cheap parallel
-workers with exact contracts, review each result once, ship.
+Use four phases to plan the change, dispatch bounded units to lower-cost
+workers, and review each result before dependent work starts.
 
 ```text
 1. GROUND     mode, repository facts, and what the user actually wants
@@ -23,7 +23,7 @@ drift out of sync with the plan the user approved.
 
 ## Authority model
 
-Three roles, and the boundaries between them are the product.
+Keep planning, implementation and review within these role boundaries.
 
 | Role | May do | May never do |
 | --- | --- | --- |
@@ -132,8 +132,8 @@ You spawn, route, review, advise, and record. You do not implement. If you are
 about to open an implementation file during this phase, stop: you have skipped
 dispatch.
 
-The mechanism, including the harness-specific calls and every way a real run has
-failed, is in `references/dispatch.md`. In outline:
+The harness-specific calls and failure-handling procedure are in
+`references/dispatch.md`. In outline:
 
 ```text
 gcl status              the frontier: units whose dependencies all passed review
@@ -179,7 +179,7 @@ gcl review <unit> --verdict human_required --question "..." --attempted "..."
 An escalation reports its own blast radius: the transitive dependents that are
 now blocked, and every independent unit that keeps running.
 
-### Spend is recorded, or the budget is decoration
+### Record usage for the budget checks
 
 Record every model turn as it finishes: yours, each manager's, and each worker's.
 
@@ -192,10 +192,8 @@ gcl usage status
 Take the numbers from the harness's own usage report for that turn. If it
 reports none, say so to the user and record the packet and report sizes as an
 explicit estimate: a rough figure that exists beats an exact one that does not.
-What must not happen is silence. A run that cannot measure its own spend cannot
-be stopped by any budget, which is how a fifth of a weekly frontier allowance
-once went into a browser-local notes app while every warning about it scrolled
-past.
+The CLI does not collect provider usage automatically. Disclose missing or
+estimated usage, since the budget check can only assess what has been recorded.
 
 `gcl emit` is the circuit breaker. On a breach it emits nothing at all and names
 what was exceeded. Then take one of three paths with the user: simplify what is
@@ -214,7 +212,7 @@ worker attempt -> manager advice -> same-worker repair -> fallback-worker repair
 units keep running. Say what is blocked, what continues, what was already tried,
 and the exact decision the user has to make.
 
-## Each of these is a failed execution, whatever the diff looks like
+## Execution failures
 
 - implementing units yourself in the root session;
 - spawning one subagent for the whole plan instead of one per unit;

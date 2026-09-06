@@ -1,7 +1,7 @@
-"""The skills are the product. These pin the rules that were paid for in real runs.
+"""Guard the skills' operational requirements, not incidental anecdotes.
 
-Each assertion below corresponds to a failure that actually happened. A future
-edit is free to reword any of them; it is not free to delete the rule.
+Text checks complement the behavioral CLI tests. Keep them aligned with the
+actual contract when public explanations are reworded.
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ class TestTheCutsHeld:
             assert procedure.lower() not in every_skill.lower()
 
     def test_there_are_four_phases(self, orchestrator):
-        assert "Four phases" in orchestrator
+        assert "four phases" in orchestrator.lower()
         for phase in ("1. GROUND", "2. PLAN", "3. APPROVE", "4. EXECUTE"):
             assert phase in orchestrator
 
@@ -133,15 +133,17 @@ class TestDispatchMechanics:
         assert "drop straight to per-unit spawns" in dispatch
 
     def test_both_signals_are_watched(self, dispatch):
-        # A worker blocked on a 429 writes nothing, exactly like one that is
-        # thinking. One run watched a directory for two minutes.
+        # Files alone cannot distinguish a provider block from active reasoning.
         assert "filesystem" in dispatch and "swarm status" in dispatch
         assert "429" in dispatch
-        assert "two minutes" in dispatch
+        assert "Check `swarm status` alongside the files" in dispatch
 
-    def test_a_live_transcript_cannot_be_read(self, dispatch):
-        assert "cannot read a live worker's transcript" in dispatch
-        assert "read_context" in dispatch
+    def test_transcript_access_is_harness_dependent(self, dispatch):
+        assert "Transcript access depends on the harness" in dispatch
+        assert "Use it when available" in dispatch
+        assert "do not repeatedly retry it" in dispatch
+        assert "health and progress signals" in dispatch
+        assert "cannot read a live worker's transcript" not in dispatch
 
     def test_the_stall_table_survives_with_its_bound(self, dispatch):
         assert "under 60s" in dispatch and "300s" in dispatch
@@ -149,7 +151,7 @@ class TestDispatchMechanics:
 
     def test_a_placeholder_route_stops_dispatch(self, dispatch, orchestrator):
         assert "ready_to_dispatch: false" in dispatch
-        assert "not the run that was approved" in dispatch
+        assert "Do not dispatch past it" in dispatch
         assert "placeholder route" in orchestrator
 
     def test_packets_go_out_verbatim(self, orchestrator, dispatch):
@@ -191,7 +193,7 @@ class TestContractsThatMakeWorkersCheap:
 
 
 class TestTheBudgetIsEnforcedNotIntended:
-    """A run spent a fifth of a weekly allowance on a notes app. These are why."""
+    """Require recorded usage and explicit authority to change budget limits."""
 
     def test_the_planner_makes_a_budget_mandatory_with_its_reason(self, planner):
         assert "circuit breaker, not an intention" in planner
@@ -210,7 +212,8 @@ class TestTheBudgetIsEnforcedNotIntended:
 
     def test_spend_must_be_recorded_as_it_happens(self, orchestrator, reviewer):
         assert "gcl usage record" in orchestrator and "gcl usage record" in reviewer
-        assert "cannot measure its own spend cannot be stopped" in orchestrator
+        assert "does not collect provider usage automatically" in orchestrator
+        assert "Disclose missing or estimated usage" in orchestrator
         assert "An unrecorded turn is not a free one" in reviewer
 
     def test_clearing_a_stop_alone_is_named_as_a_failed_execution(self, orchestrator):

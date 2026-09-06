@@ -1,7 +1,7 @@
 # Dispatch
 
-How phase 4 actually puts work into subagents. Every rule here corresponds to a
-way a real run has already failed, so none of it is theory.
+Phase 4 uses the approved packets to spawn workers, monitor progress and route
+submissions to their managers.
 
 The rule it serves: **every unit runs in its own spawned subagent, and the
 Director never implements one itself.**
@@ -20,13 +20,13 @@ Director never implements one itself.**
 }
 ```
 
-`ready_to_dispatch: false` means the graph will run, but not the run that was
-approved. Fix what the warnings name and re-emit. Do not dispatch past it.
+`ready_to_dispatch: false` means preflight has not passed. Fix the reported
+problems and re-emit. Do not dispatch past it.
 
-Then check the swarm for stale state, and clean it **narrowly**. Plan nodes from
-an earlier session survive and merge into yours: one run emitted a 3-node graph
-and got a 55-node plan. If the harness reports more nodes than your plan has,
-that is what happened.
+Then check the swarm for stale state, and clean it **narrowly**. A shared registry
+may contain nodes from earlier sessions or unrelated projects. Reconcile their
+IDs and ownership before removing any node; an unexpected count alone does not
+tell you which nodes are safe to remove.
 
 ```text
 swarm list                  see what exists before removing anything
@@ -34,10 +34,9 @@ remove the stale nodes      by id, the ones that are not in your plan
 swarm cleanup --force       last resort only, after confirming no unrelated agent runs
 ```
 
-**Never open with `swarm cleanup --force`.** An earlier version of this file told
-you to, and a run followed it and stopped every worker on the machine, including
-agents belonging to unrelated projects. It is global, it does not scope to your
-graph, and other people's work is not yours to kill. If you cannot scope the
+**Never open with `swarm cleanup --force`.** It is global rather than scoped to
+your graph and may stop workers from unrelated projects. Remove only stale nodes
+whose IDs and ownership you have verified. If you cannot scope the
 removal and unrelated agents are live, leave the swarm alone and spawn per unit,
 which does not depend on a clean plan registry. Say that you did so and why.
 
@@ -100,17 +99,18 @@ swarm status    is it alive?    running, rate-limited, errored, dead
 
 Polling only the filesystem is the trap. A worker blocked on a `429` produces no
 files, and so does a worker that is thinking hard. They are identical from a
-directory listing. One real run polled for a file for two minutes while the
-worker sat rate-limited the whole time, because `swarm status` was never checked.
+directory listing. Check `swarm status` alongside the files to distinguish a
+provider block from an active worker.
 
-**You cannot read a live worker's transcript.** `swarm read_context` returns busy
-while the agent runs, and `session_search` returns metadata only. Plan around it
-instead of retrying the call:
+**Transcript access depends on the harness.** Use it when available. If a live
+context read returns busy or a session lookup exposes only metadata, do not
+repeatedly retry it; use the available health and progress signals:
 
 - Packets require a progress log and incremental writes, so the filesystem
   carries the progress the transcript will not.
-- Token growth without file growth is its own signal: alive and producing, but
-  nothing landing. That is a loop or an over-long preamble, not a freeze.
+- Token growth without file growth means the model is still producing output.
+  It can indicate a loop or long analysis, but is not proof of either. Compare it
+  with the unit's expected checkpoints and time bounds.
 - If you need to know what a worker did, that is what its report and artifacts
   are for. Wait for the terminal state rather than trying to watch.
 

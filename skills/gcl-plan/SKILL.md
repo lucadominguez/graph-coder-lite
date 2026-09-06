@@ -54,13 +54,11 @@ budget:
     models: [in-house-7b]        # optional, for families the built-in list misses
 ```
 
-A run once spent about a fifth of a weekly frontier allowance producing a
-browser-local notes app. The code was fine. What failed is that the design goal,
-spend premium reasoning once and let cheap models execute, was written as
-guidance, and nothing recorded what was being spent, so nothing could notice.
+The CLI checks recorded usage, not provider accounts. The Director must record
+model turns and disclose missing or estimated measurements. The example values
+above illustrate the format; size them for the actual project.
 
-Two things follow, and both are why the numbers above are shaped the way they
-are.
+Account for both subscription quotas and supervision costs:
 
 - **Dollars are not the scarce resource.** A subscription route has no marginal
   dollar price, which is exactly why a router scoring dollars spends it freely.
@@ -142,8 +140,8 @@ Prefer an assertion a command can decide.
 
 ### The progress contract is what makes a stall detectable
 
-A worker's transcript cannot be read while it runs, so the plan has to say in
-advance what progress will look like on disk. Without it, an agent 900 items into
+Not every harness exposes a live worker transcript. Define progress on disk as
+well as using whatever live status or transcript access the harness provides. Without it, an agent 900 items into
 a long job and an agent wedged in a dead loop are the same observation: nothing
 new written.
 

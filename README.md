@@ -4,169 +4,208 @@
 
 # Graph Coder Lite
 
-Part of the [Graph Coder](https://github.com/lucadominguez/graph-coder) family:
-the same method with the ceremony removed. Ten phases became four, eight skills
-became three, and the plan, the graph, the routes, and the ledger became one
-file. What survived is the part that was paid for in failed runs.
+Lite is the [Graph Coder](https://github.com/lucadominguez/graph-coder) method
+with a smaller toolset: four phases, three skills, and one plan file. A Director
+plans the work, workers implement bounded units, and managers review the results.
+The `gcl` CLI checks the plan and keeps the run's state in JSON.
 
 ```text
-1. GROUND     mode, repository facts, and what the user actually wants
-2. PLAN       one plan file: decisions, units, managers, routes
-3. APPROVE    render it in full, bind approval to the unit contracts
-4. EXECUTE    dispatch, review, escalate, finish
+1. GROUND     establish the repository facts and what the user wants
+2. PLAN       write decisions, units, managers and routes in PLAN.md
+3. APPROVE    show the full plan and record approval of its contracts
+4. EXECUTE    dispatch units, review results and handle blocked work
 ```
 
-## Quickstart
+Use Lite if you want mechanical checks without Full's compiled graph, routing
+pipeline and SQLite ledger. Use [Nano](https://github.com/lucadominguez/graph-coder-nano)
+if you want only the skill instructions and can supervise the checks yourself.
+
+## Install and try it
+
+You need Git and Python 3.11 or later. On Linux or macOS:
 
 ```sh
-pip install -e ".[dev]"
-gcl init                                  # writes PLAN.md
-gcl check                                 # every defect in one pass
-gcl route set --model <model> --fallback <model>
-gcl approve --rendered                    # after showing the user the whole plan
-gcl emit                                  # packets for the ready units
+git clone https://github.com/lucadominguez/graph-coder-lite.git
+cd graph-coder-lite
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+gcl init
+gcl check
 ```
 
-Then install the skills into your harness and run `/graph-coder-lite`.
+This creates and checks an example `PLAN.md`; it does not start any agents.
+Replace the example with a plan for your own project before using it for work.
+
+Install the skills into your harness. For JCode:
+
+```sh
+bash scripts/install.sh --dest ~/.jcode/skills
+```
+
+On Windows, open PowerShell in the cloned repository:
 
 ```powershell
+py -m venv .venv
+.\.venv\Scripts\python -m pip install -e .
+.\.venv\Scripts\gcl --help
 powershell -File scripts/install.ps1 -Dest "$env:USERPROFILE\.jcode\skills"
 ```
 
+Activate the environment or use the executable's full path when running `gcl`.
+Start a new harness session if it loads skills only at startup, then ask it to
+use `/graph-coder-lite`.
+
+Before dispatch, set actual worker and fallback model IDs accepted by your
+harness. The values below are placeholders to replace, not recommended routes:
+
 ```sh
-./scripts/install.sh --dest ~/.jcode/skills
+gcl route set --model 'your-worker-model' --fallback 'your-fallback-model'
+gcl check
+# Show the entire plan to the user and obtain approval before this command.
+gcl approve --rendered
+gcl emit
+# Inspect the JSON: dispatch only when preflight.ready_to_dispatch is true.
 ```
 
-## What it does
+`gcl emit` produces packets, not running agents. The Director sends those packets
+to the harness and records the resulting work and reviews.
 
-**The plan file is the graph.** Units declare their own dependencies, manager,
-scopes, and route. There is no second artifact to compile, so nothing can drift
-away from the plan the user approved.
+## What the CLI checks
 
-**`gcl check` refuses what prose cannot.** A unit missing a contract field. A
-dependency that names nothing. An acceptance criterion no unit satisfies. Two
-units that can run at the same time and write the same file, including through a
-parent directory and including `SRC/Store.py` versus `src/store.py`, which are
-one file on Windows. A path in both read scope and forbidden scope.
+**The plan is the graph.** Units declare their dependencies, manager, scopes and
+route in one file. There is no separate compiled graph to keep in sync. JSON
+state records execution; it does not replace the approved plan.
 
-**`gcl emit` builds the packet.** Objective, scopes as hard bounds, procedure,
-acceptance with descriptions, the output contract, red and green commands, the
-progress protocol, stop conditions, and a report template. Send it verbatim.
+`gcl check` reports missing contract fields, unknown dependencies and uncovered
+acceptance criteria. It also checks for concurrent write-scope collisions,
+including parent-directory overlaps and case-insensitive path matches, and for
+paths that appear in both read and forbidden scope.
 
-**One review, and it is the only gate.** A worker submits a report; its manager
-checks the artifact's contents against the output contract. `completed` exists
-only through `gcl review`, which refuses a pass with no evidence, a repair with
-no defect and instruction, and an escalation with no question or account of what
-was already tried. So every completion carries the evidence that justified it,
-by construction rather than by convention.
+`gcl emit` builds a packet with the objective, file boundaries, procedure,
+acceptance criteria, output contract, validation commands, progress expectations,
+stop conditions and report template. The Director should send it unchanged.
+Its preflight flags unapproved plans and placeholder routes. **The Director must
+stop unless `preflight.ready_to_dispatch` is `true`.** `gcl emit` can return
+`ok: true` and preview packets even when that flag is false; neither a zero exit
+code nor the presence of packets authorizes dispatch. Budget breaches, by contrast,
+stop packet emission.
 
-**The preflight will not let you dispatch the wrong run.** It blocks on a
-placeholder route, which means the workers would run on whatever default the
-harness supplies, and on a plan that was never approved.
+A worker's report is not a completion verdict. Its manager checks the artifacts
+and records the outcome through `gcl review`, the only CLI path to `completed`.
+The command requires evidence for a pass, a defect and instruction for repair,
+and a question plus an account of previous attempts for escalation. These checks
+require a structured record; they cannot establish that an agent's evidence is
+truthful. The manager still has to inspect the work.
 
-**The budget is a circuit breaker, not an intention.** Every plan declares one,
-every model turn is recorded against it, and a breach makes `gcl emit` emit
-nothing rather than warn. See below.
+## Budgets and usage
 
-## The budget
+A plan declares spending limits. Record model turns with `gcl usage record`;
+`gcl usage status` reports the totals, and budget breaches block `gcl emit`.
+The CLI does not automatically collect usage from your model provider or harness.
+Missing usage records mean the budget checks have an incomplete picture.
 
-A run once spent about a fifth of a weekly frontier allowance producing a
-browser-local notes app. The code was fine. What failed is that the design goal,
-spend premium reasoning once and let cheap models execute, was written as
-guidance, and nothing recorded what was being spent, so nothing could notice.
+For example:
 
 ```yaml
 budget:
-  frontier_tokens: 250000        # what the Director may spend planning and directing
-  worker_tokens: 1500000         # what all workers together may spend implementing
-  control_plane_share_max: 0.35  # the largest share of the run overhead may be
+  frontier_tokens: 250000        # Director planning and direction
+  worker_tokens: 1500000         # all workers combined
+  control_plane_share_max: 0.35  # maximum share spent on supervision
   protected:
-    provider: anthropic          # budgeted in its own tokens, never traded for price
-    tokens: 300000               # 0 bars the provider from this run entirely
-    models: [in-house-7b]        # optional, for families the built-in list misses
+    provider: anthropic          # a separately protected token allowance
+    tokens: 300000               # 0 bars the provider from the run
+    models: [in-house-7b]        # optional additional model families to protect
 ```
 
-**Dollars are not the scarce resource.** A subscription route has no marginal
-dollar price, which is exactly why a router that scores dollars spends it
-freely. A weekly quota is finite, and running out of it costs the user their
-week rather than a few cents. The protected provider is budgeted in its own
-units, and `gcl route set` refuses to put it on a worker route without
-`--allow-protected`: workers are the many, and the many exhaust an allowance. It
-matches the provider's model families rather than its name, because a route says
-`claude-sonnet-5` and never says `anthropic`.
+These numbers illustrate the format; they are not measured requirements or
+expected savings. Choose limits that fit your project and account.
 
-**The control plane is overhead, not work.** Directing, reviewing, and
-monitoring produce no artifact. When they pass `control_plane_share_max` of
-everything spent, the run has stopped being worth its own supervision.
+A subscription can have no per-request price and still have a limited quota.
+The protected-provider setting accounts for that separately. `gcl route set`
+requires `--allow-protected` to put a protected model on a worker route. Built-in
+model-family matching identifies common provider models; use `protected.models`
+for additional names it does not recognize.
+
+The control-plane limit counts supervision as overhead. It can stop a run whose
+planning, direction and review are consuming too much of its recorded usage.
 
 ```sh
 gcl usage record --role worker --provider openai --model gpt-x \
                  --input 12000 --output 3000 --unit IU-STORE
-gcl usage status          # spend by role, provider, and unit, against the caps
+gcl usage status
 ```
 
-Every breach is a hard stop, because a warning is what the run that motivated
-this already had.
+Use the actual provider, model, unit and token counts from your run. A budget
+breach prevents new packet emission; it does not cancel requests already running
+in an external harness.
 
-## The unit contract
+## Writing a useful unit contract
 
-Nineteen fields, all load-bearing. Three of them are the ones people skip:
+A unit needs more than a file path and a request to implement something. Two
+fields deserve particular attention:
 
 ```yaml
-output_contract:      # what is inside the artifact, not that it exists
+output_contract:
   - Every record carries title, price, and url, all non-empty.
   - At least 20 records and no more than 200 from one catalogue page.
 progress_contract:
-  checkpoint_every: each detail page       # so silence can be read correctly
-  writes_incrementally: true               # so a death at item 900 loses nothing
-  command_timeout_seconds: 300             # so a blocked worker is not a hung one
+  checkpoint_every: each detail page
+  writes_incrementally: true
+  command_timeout_seconds: 300
 ```
 
-A unit that says "scrape the listings and submit a report" is satisfied by a
-scraper that returns nothing: the code ran, the file exists, and no criterion
-described the contents. And because a running worker's transcript cannot be read,
-an agent 900 items in and an agent wedged in a dead loop produce the same
-observation unless the plan said in advance what progress would look like.
+The output contract describes the contents, not just the existence of a file.
+Otherwise, a scraper that produces an empty file can satisfy the literal task
+while being useless to the user.
 
-`src/gcl/templates/example-plan.md` is a complete plan that passes `gcl check`.
+The progress contract helps distinguish work from a stall. Use status and
+transcripts where the harness exposes them, together with checkpoints and file
+changes. Save batches as they finish so an interruption does not lose the whole
+result. Command timeouts also make blocked work easier to diagnose.
+
+[`example-plan.md`](src/gcl/templates/example-plan.md) contains a complete unit
+and passes `gcl check`.
 
 ## Commands
 
 ```text
 gcl init                                  write a starting plan
-gcl check                                 every defect in the plan, in one pass
-gcl status                                states, frontier, what blocks what
-gcl emit [--unit ID]                      packets for the ready units + preflight
-gcl set <unit> <state> [--note ...]       record a transition, never a verdict
-gcl verify <unit>                         gather the evidence a review rests on
-gcl review <unit> --verdict <v> ...       the only path to completed
+gcl check                                 report defects in the plan
+gcl status                                show states, ready units and blockers
+gcl emit [--unit ID]                       emit packets after preflight
+gcl set <unit> <state> [--note ...]         record a transition, never a verdict
+gcl verify <unit>                          gather evidence for a review
+gcl review <unit> --verdict <v> ...         record pass, repair or escalation
 gcl route set --model M [--fallback F] [--unit ID] [--evidence E]
 gcl usage record --role R --provider P --model M --input N --output N [--unit ID]
-gcl usage status                          spend against the budget, and whether to stop
-gcl approve --rendered                    bind approval to the unit contracts
-gcl recover [--apply]                     reconcile after an interrupted session
+gcl usage status                          compare recorded spend with the budget
+gcl approve --rendered                     bind approval to the unit contracts
+gcl recover [--apply]                      reconcile an interrupted session
 ```
 
-## What was removed, and why it was safe
+## Differences from Full
 
-| Removed | Why |
+| Change | Trade-off |
 | --- | --- |
-| Cold rehearsal, and the double pass for high-risk units | A whole phase of agents reading packets to predict problems. The manager review catches the same defects against real artifacts. |
-| Separate concept and research phases | Both were question-asking with heavy schemas around them. Folded into GROUND and PLAN as bounded steps. |
-| The compiled graph artifact | Derived from the units instead, so it cannot drift. |
-| The benchmark-scoring router | What mattered in real runs was refusing to dispatch an unrouted node, not the scoring math. That check stayed, and cost control moved to the budget, which measures what was actually spent instead of predicting it. |
-| The SQLite ledger | One JSON state file rebuilds the frontier after a reload, and `gcl recover` reopens anything that cannot be shown to have finished. |
+| No cold-rehearsal phase | Less work before dispatch, but packet defects may be found later during implementation or review. |
+| Concept and research work folded into GROUND and PLAN | Fewer handoffs; the Director must still resolve consequential questions before dispatch. |
+| No compiled graph artifact | Dependencies come from the plan, with fewer separate files to reconcile. |
+| Explicit model routes instead of benchmark scoring | You choose the models. Preflight checks the routes and budget, not their suitability for the task. |
+| JSON state instead of a SQLite ledger | Simpler local storage. `gcl recover` helps reconcile work after an interruption. |
 
-What stayed: the three-role authority model, the single manager review gate, the
-full dispatch mechanics, the output and progress contracts, the bounded
-escalation ladder, write-scope disjointness, and evidence-based completion.
+Lite keeps the Director/Manager/Worker boundaries, manager review, output and
+progress contracts, bounded escalation, and checks for concurrent write-scope
+overlap. Removing rehearsal is a trade-off, not evidence that review catches
+every defect rehearsal would have found. Live agent adherence and end-to-end
+cost savings have not been evaluated.
 
 ## Development
 
 ```sh
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 python -m pytest -q
 python -m ruff check src tests
 ```
 
-MIT licensed. See `NOTICE` for provenance.
+MIT licensed. See [NOTICE](NOTICE) for provenance.

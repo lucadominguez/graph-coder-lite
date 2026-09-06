@@ -1,4 +1,4 @@
-"""The `gcl` command line. Seven commands, and none of them writes your code."""
+"""The `gcl` command line for plan checks, worker packets, and run-state records."""
 
 from __future__ import annotations
 

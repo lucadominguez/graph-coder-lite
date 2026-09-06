@@ -1,22 +1,8 @@
-"""The resource budget, as an invariant rather than an intention.
+"""Check recorded token usage against the plan's resource limits.
 
-A run once spent about a fifth of a weekly frontier-model allowance producing a
-browser-local notes app. Nothing was wrong with the code it produced. What went
-wrong is that the design goal, spend premium reasoning once and let cheap models
-execute, was written as guidance and never enforced, and nothing recorded what
-was actually being spent, so nothing could notice.
-
-Two ideas do the work here.
-
-**Dollars are not the scarce resource.** A subscription route has no marginal
-dollar price, which is exactly why a router that scores dollars will spend it
-freely. Weekly quota is finite, and running out of it costs the user their whole
-week rather than a few cents. A protected provider is therefore budgeted in its
-own units and never traded against price.
-
-**Control plane is overhead, not work.** Directing, reviewing, and monitoring
-produce no artifact. When they cost more than the implementation they are
-supervising, the run has stopped being worth its own supervision.
+Provider quotas are tracked separately from dollar prices. Director and manager
+usage also counts toward the control-plane share. The caller supplies usage
+records; this module does not collect provider telemetry or cancel live requests.
 """
 
 from __future__ import annotations
@@ -206,8 +192,7 @@ def names_protected(route: str, budget: dict[str, Any]) -> bool:
 def assess(budget: dict[str, Any], ledger: Ledger) -> dict[str, Any]:
     """Compare observed spend against the budget, and say whether to stop.
 
-    Every breach here is a hard stop rather than a warning. A warning is what the
-    postmortem run had, and it kept going.
+    A breach sets the stop flag used by dispatch preflight.
     """
 
     breaches: list[str] = []
