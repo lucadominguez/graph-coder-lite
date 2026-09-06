@@ -1,12 +1,13 @@
+<p align="center">
+  <img src="assets/banner.png" alt="Graph Coder Lite" width="720">
+</p>
+
 # Graph Coder Lite
 
-Plan once with real effort. Dispatch the work to cheap parallel subagents with
-exact contracts. Review each result once. Ship.
-
-This is [Graph Coder](https://github.com/lucadominguez/graph-coder) with the
-ceremony removed. Ten phases became four, eight skills became three, and the
-plan, the graph, the routes, and the ledger became one file. What survived is
-the part that was paid for in failed runs.
+Part of the [Graph Coder](https://github.com/lucadominguez/graph-coder) family:
+the same method with the ceremony removed. Ten phases became four, eight skills
+became three, and the plan, the graph, the routes, and the ledger became one
+file. What survived is the part that was paid for in failed runs.
 
 ```text
 1. GROUND     mode, repository facts, and what the user actually wants

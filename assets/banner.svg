@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+  <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="1"/>
+</pattern>
+<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M 0 0 L 10 5 L 0 10 z" fill="#22d3ee"/>
+</marker>
+</defs>
+<rect width="1280" height="640" fill="#020617"/>
+<rect width="1280" height="640" fill="url(#grid)"/>
+<text x="640.0" y="120" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="72" font-weight="800" letter-spacing="8" fill="#cbd5e1">GRAPH CODER LITE</text>
+<line x1="320.0" y1="152" x2="960.0" y2="152" stroke="#22d3ee" stroke-width="4"/>
+<text x="640.0" y="194" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" fill="#94a3b8">The same method with the ceremony removed: four phases, three skills, one plan file</text>
+<rect x="118.0" y="228" width="240" height="52" rx="26" fill="none" stroke="#22d3ee" stroke-width="2"/>
+<text x="238.0" y="261" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" fill="#22d3ee">4 PHASES</text>
+<rect x="386.0" y="228" width="240" height="52" rx="26" fill="none" stroke="#a78bfa" stroke-width="2"/>
+<text x="506.0" y="261" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" fill="#a78bfa">3 SKILLS</text>
+<rect x="654.0" y="228" width="240" height="52" rx="26" fill="none" stroke="#34d399" stroke-width="2"/>
+<text x="774.0" y="261" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" fill="#34d399">GCL CLI</text>
+<rect x="922.0" y="228" width="240" height="52" rx="26" fill="none" stroke="#fbbf24" stroke-width="2"/>
+<text x="1042.0" y="261" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" fill="#fbbf24">JSON STATE</text>
+<text x="640.0" y="336" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="16" letter-spacing="3" fill="#64748b">A CLI THAT REFUSES THE RUN A BAD PLAN WOULD CAUSE</text>
+<line x1="371" y1="435.0" x2="389" y2="435.0" stroke="#94a3b8" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="631" y1="435.0" x2="649" y2="435.0" stroke="#94a3b8" stroke-width="3" marker-end="url(#arrow)"/>
+<line x1="891" y1="435.0" x2="909" y2="435.0" stroke="#94a3b8" stroke-width="3" marker-end="url(#arrow)"/>
+<g>
+<rect x="135" y="380" width="230" height="110" rx="12" fill="#0f172a"/>
+<rect x="135" y="380" width="230" height="110" rx="12" fill="#22d3ee" stroke="#22d3ee" stroke-width="2"/>
+<text x="250.0" y="431.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" font-weight="700" fill="#cbd5e1">GROUND</text>
+<text x="250.0" y="459.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="13" fill="#64748b">repository facts</text>
+</g>
+<g>
+<rect x="395" y="380" width="230" height="110" rx="12" fill="#0f172a"/>
+<rect x="395" y="380" width="230" height="110" rx="12" fill="#a78bfa" stroke="#a78bfa" stroke-width="2"/>
+<text x="510.0" y="431.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" font-weight="700" fill="#cbd5e1">PLAN</text>
+<text x="510.0" y="459.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="13" fill="#64748b">one plan file</text>
+</g>
+<g>
+<rect x="655" y="380" width="230" height="110" rx="12" fill="#0f172a"/>
+<rect x="655" y="380" width="230" height="110" rx="12" fill="#fbbf24" stroke="#fbbf24" stroke-width="2"/>
+<text x="770.0" y="431.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" font-weight="700" fill="#cbd5e1">APPROVE</text>
+<text x="770.0" y="459.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="13" fill="#64748b">full render, bound</text>
+</g>
+<g>
+<rect x="915" y="380" width="230" height="110" rx="12" fill="#0f172a"/>
+<rect x="915" y="380" width="230" height="110" rx="12" fill="#34d399" stroke="#34d399" stroke-width="2"/>
+<text x="1030.0" y="431.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="24" font-weight="700" fill="#cbd5e1">EXECUTE</text>
+<text x="1030.0" y="459.0" text-anchor="middle" font-family="ui-monospace, 'JetBrains Mono', 'DejaVu Sans Mono', monospace" font-size="13" fill="#64748b">gcl-guarded</text>
+</g>
+</svg>
